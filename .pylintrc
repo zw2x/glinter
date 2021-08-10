@@ -1,0 +1,5 @@
+[MESSAGES CONTROL]
+disable=invalid-name, missing-function-docstring, missing-class-docstring, missing-module-docstring
+
+[TYPECHECK]
+generated-members=numpy.*, torch.*
