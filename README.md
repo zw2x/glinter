@@ -5,6 +5,7 @@ Require `python>=3.7`
 
 Clone the repository and install it
 ```bash
+git clone https://github.com/zw2x/glinter.git
 cd glinter
 pip install -e .
 ```
@@ -17,7 +18,9 @@ Manually install the following softwares and models
 * [hh-suite](https://github.com/soedinglab/hh-suite)
 * [esm_msa1_t12_100M_UR50S](https://github.com/facebookresearch/esm)
 
-The taxonomy database and model weights can be found at: http://
+The taxonomy database and model weights can be found at 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5172929.svg)](https://doi.org/10.5281/zenodo.5172929)
+
 
 ## Usage
 The following commands are executed in the repository `glinter`.
