@@ -38,3 +38,8 @@ scripts/run.sh examples/1a59A.pdb examples/1a59B.pdb examples/
 ```
 
 The output is `examples/1a59A:1a59B/1a59A:1a59B.out.pkl`
+
+## Note
+Please use the [uniclust database](http://wwwuser.gwdg.de/~compbiol/uniclust/2016_09/)
+`A3M_SpecBloc` requires the header of each hit starts with `tr|` and contains `OS=$TAX`, `$TAX` is the taxonomy name.
+
