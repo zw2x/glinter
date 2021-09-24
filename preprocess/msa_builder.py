@@ -111,10 +111,8 @@ def build_msa(
                 msa_path, fetch_length=False
             )
             rec_len, lig_len = _len, _len
-            rec = msa_name 
-            lig = rec
+            rec, lig = msa_name, msa_name
             concated = False
-            assert len(read_seqfile(seq_paths[rec])) == rec_len
 
         hw = heniw(msa,)
         if len(hw) > maxk and maxk > 0:
@@ -182,7 +180,6 @@ if __name__ == '__main__':
     """Build MSA features for monomers and dimers
     """
     args = _get_options()
-
     models, ents = None, None
     if args.model:
         models, ents = read_ents(args.model, return_both=True, key=1,)
@@ -190,9 +187,7 @@ if __name__ == '__main__':
         models = args.a3mdir.stem
         ents = models.split(':')
         models = [ models ]
-
     _ref = models if args.use_concat else ents
-
     a3mpaths = []
     for name in _ref:
         if args.use_hhfilter:

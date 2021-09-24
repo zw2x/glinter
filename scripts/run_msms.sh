@@ -46,4 +46,5 @@ mv $reduced $tgtdir
 mv $file_base.vert $tgtdir
 mv $file_base.face $tgtdir
 mv $file_base.area $tgtdir
-rm -rf $tmpdir
+mv $xyzrn $tgtdir
+# rm -rf $tmpdir

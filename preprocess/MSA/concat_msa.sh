@@ -1,3 +1,4 @@
+#! /usr/bin
 srcdir=$1
 name=$(basename $srcdir)
 

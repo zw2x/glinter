@@ -13,7 +13,7 @@ from Bio.PDB import PDBParser
 from glinter.protein import get_atom_residues
 from glinter.protein.chemistry import radii
 
-def chain_to_xyzrn(pdb_path, xyzrn_path, ignore_h=True):
+def chain_to_xyzrn(pdb_path, xyzrn_path, ignore_h=False):
     """
     from .pdb file to .xyzrn file (xyz-radius-name)
     Args:

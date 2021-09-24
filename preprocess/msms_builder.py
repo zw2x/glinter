@@ -212,10 +212,13 @@ def dump_feature(args, chs, overwrite=False, dump=True,):
                 residue_feats=rfeats,
             )
 
-            if seqmap is not None:
+            if seqmap is not None and ch in seqmap:
                 _seqmap = seqmap[ch]
             else:
-                _seqmap = None # map to itself
+                _seqmap = {
+                    'ref':ch, 'tbeg':1, 'qbeg':1, 'cigar':f'{len(seq)}M',
+                    'refseq':seq,
+                }
 
             sample = dict(
                 name=ch,

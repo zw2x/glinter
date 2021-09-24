@@ -48,10 +48,7 @@ def build_ca_graph(
     elif only_embed:
         use_distance_graph = False
 
-    if alnidx is not None:
-        srcidx, tgtidx = alnidx # src: pdbseq, tgt: a3mseq
-    else:
-        srcidx, tgtidx = None, None
+    srcidx, tgtidx = alnidx # src: pdbseq, tgt: a3mseq
     # build node pos
     coords = sample['COORD'].to(torch.float32)
     if rotmat is not None:
@@ -80,8 +77,7 @@ def build_ca_graph(
     pos_encoding = torch.arange(seq.size(0), dtype=torch.float32) / seq.size(0)
     # build pssm
     pssm = torch.zeros((seq.size(0), 20), dtype=torch.float32)
-    if srcidx is not None:
-        pssm[srcidx] = sample['pssm'].to(torch.float32)[tgtidx]
+    pssm[srcidx] = sample['pssm'].to(torch.float32)[tgtidx]
     
     node_embed = [sas.view(-1, 1), seq, pos_encoding.view(-1,1), pssm]
 

@@ -1,9 +1,11 @@
 from pathlib import Path
 
 import torch
-from torch import nn
+import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
+# from glinter.model.atomgcn import AtomGCN
+# from glinter.module.conv import make_layer, ResNet, BasicBlock2d, Bottleneck2d
 from glinter.esm_embed import load_esm_model
 from glinter.modules.atomgcn import AtomGCN
 from glinter.modules.conv import make_layer, ResNet, BasicBlock2d, Bottleneck2d
@@ -39,17 +41,17 @@ class MSAModel(nn.Module):
             default='sym',
         )
 
-        parser.add_argument('--generate-esm-attention', action='store_true')
-
     def __init__(
-        self, args, esm_embed=None, prepend_bos=False,
+        self, args, esm_embed=None, prepend_bos=False, gen_esm=False
     ):
         super().__init__()
         self.args = args
+        
+        self._gen_esm = gen_esm
+        if self._gen_esm:
+            assert esm_embed is not None
 
-        self._gen_esm = args.generate_esm_attention
-
-        self.esm_embed = esm_embed
+        self.esm_embed = None
         self.prepend_bos = prepend_bos
 
         embed_dim = 0
@@ -114,7 +116,7 @@ class MSAModel(nn.Module):
                 ),
             )
 
-        if self.args.feature.use('atom-graph', 'heavy-atom-graph'):
+        if self.args.feature.use('atom-graph'):
             _local_dim = 128
             src_graphs.append(
                 dict(
@@ -220,6 +222,8 @@ class MSAModel(nn.Module):
 
         if self.encoder_1d is not None:
             y_rec, y_lig = self.encoder_1d_forward(data)
+            y_rec = y_rec[:, :, data['recidx'][0]]
+            y_lig = y_lig[:, :, data['ligidx'][0]]
             reclen, liglen = y_rec.size(-1), y_lig.size(-1)
             y = torch.cat(
                 (
@@ -276,43 +280,46 @@ if __name__ == '__main__':
     from glinter.dataset.dimer_dataset import DimerDataset
     from glinter.dataset.collater import Collater
     from glinter.models.checkpoint_utils import load_state
-
+    # torch.manual_seed(123)
     parser = argparse.ArgumentParser()
 
-    MSAModel.add_args(parser)
     DimerDataset.add_args(parser)
+    MSAModel.add_args(parser)
     parser.add_argument('--ckpt-path', type=Path)
-
-    args = parser.parse_args()
+    parser.add_argument('--generate-esm-attention', action='store_true')
+    args, _ = parser.parse_known_args()
 
     if args.generate_esm_attention:
+        args = parser.parse_args()
         esm_embed, alphabet = load_esm_model(args.ckpt_path)
         model = MSAModel(
-            args, esm_embed=esm_embed, prepend_bos=alphabet.prepend_bos,
+            args, esm_embed=esm_embed, prepend_bos=alphabet.prepend_bos, gen_esm=True
         )
         dataset = DimerDataset(args, esm_alphabet=alphabet)
     else:
-        model = MSAModel(args)
         if args.ckpt_path is not None:
             assert args.ckpt_path.exists(), f"{args.ckpt_path} does not exist"
             state = load_state(args.ckpt_path)
+            model = MSAModel(args)
             model.load_state_dict(state, strict=True)
-
         dataset = DimerDataset(args,)
-
     collater = Collater()
-
-    if args.generate_esm_attention:
-        batch = collater([ dataset.get_msa(0) ])
-        fname = args.dimer_root.parent.joinpath(args.dimer_root.stem + '.esm.pkl')
-        with torch.no_grad():
-            output = model(batch['data']).cpu()
-        with open(fname, 'wb') as handle:
-            pickle.dump(output, handle)
-    else:
-        batch = collater([ dataset[0] ])
-        with torch.no_grad():
-            output = model(batch['data']).cpu()
-        fname = args.dimer_root.parent.joinpath(args.dimer_root.stem + '.out.pkl')
-        with open(fname, 'wb') as handle:
-            pickle.dump(output, handle)
+    model.eval()
+    for i in range(len(dataset)):
+        name = dataset.dimers[i][0]
+        if args.generate_esm_attention:
+            batch = collater([ dataset.get_msa(i) ])
+            fname = args.dimer_root.parent.joinpath(name + '.esm.npz')
+            with torch.no_grad():
+                output = model(batch['data']).cpu().numpy().astype(np.float16)
+            np.savez_compressed(fname, esm=output)
+        else:
+            batch = collater([ dataset[i] ])
+            output = {'model':{}}
+            with torch.no_grad():
+                output['model']['output'] = model(batch['data']).cpu()
+            output['model']['recidx'] = batch['data']['recidx'].cpu()
+            output['model']['ligidx'] = batch['data']['ligidx'].cpu()
+            fname = args.dimer_root.parent.joinpath(name + '.out.pkl')
+            with open(fname, 'wb') as handle:
+                pickle.dump(output, handle)

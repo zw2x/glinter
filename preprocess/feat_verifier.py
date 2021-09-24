@@ -36,7 +36,7 @@ def load_target(path):
     return tgt
 
 def check_consistency(
-    tpaths, mpaths, dpaths, rec, lig, dname, msa_repo=None, repo=None, augment=True, ignore_seqid=False,
+    tpaths, mpaths, dpaths, rec, lig, dname, msa_repo=None, repo=None, augment=True, ignore_seqid=True,
 ):
     """Return a list of models that have consistent features 
     Args:
@@ -66,7 +66,7 @@ def check_consistency(
     # check seqmap
     rec_seqmap = recten['seqmap']
     lig_seqmap = ligten['seqmap']
-    if rec_seqmap is not None and lig_seqmpa is not None:
+    if rec_seqmap is not None and lig_seqmap is not None:
         # check refname
         refrec = rec_seqmap['ref']
         reflig = lig_seqmap['ref']
@@ -154,7 +154,7 @@ def _get_options():
     )
     parser.add_argument('--repo', type=Path, help='repo path',)
     parser.add_argument('--msa-repo', type=Path, help='repo MSA path',)
-    parser.add_argument('--ignore-seqid', action='store_true')
+    parser.add_argument('--check-seqid', action='store_true')
     args = parser.parse_args()
 
     return args
@@ -164,7 +164,6 @@ if __name__ == '__main__':
     Verify and collect features
     """
     args = _get_options()
-
     dpaths = dict(
         (_.stem.split('.')[0], _) for _ in args.msa_dir.glob('**/*.msa')
     )
@@ -178,7 +177,7 @@ if __name__ == '__main__':
         models = read_models(args.model)
     else:
         models = {args.mten_dir.stem: args.msa_dir.stem}
-
+    print(models)
     # find avail models
     hts, hms = dict(), dict()
     for mname in list(models.keys()):
@@ -218,7 +217,7 @@ if __name__ == '__main__':
         rec, lig = name.split(':')
         if check_consistency(
             tpaths, mpaths, dpaths, rec, lig, dname,
-            repo=repo, msa_repo=msa_repo, ignore_seqid=args.ignore_seqid,
+            repo=repo, msa_repo=msa_repo, ignore_seqid=not args.check_seqid,
         ):
             n += 1
 
@@ -227,14 +226,13 @@ if __name__ == '__main__':
         rec, lig = name.split(':')
         if check_consistency(
             tpaths, mpaths, dpaths, rec, lig, dname,
-            repo=repo, msa_repo=msa_repo, ignore_seqid=args.ignore_seqid,
+            repo=repo, msa_repo=msa_repo, ignore_seqid=not args.check_seqid,
         ):
             n += 1
 
     if repo is not None and len(repo) > 0:
         with open(args.repo, 'wb') as h:
             pickle.dump(repo, h)
-#        print(len(repo))
 
     if msa_repo is not None and len(msa_repo) > 0:
         with open(args.msa_repo, 'wb') as h:

@@ -98,7 +98,7 @@ def read_models(path):
         line = line.strip()
         if not line:
             continue
-        fields = line.split('\t')
+        fields = line.split()
         pdbpair, seqpair = fields[:2]
         assert pdbpair not in models
         models[pdbpair] = seqpair

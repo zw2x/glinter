@@ -26,7 +26,7 @@ def load_msa(
     Returns:
     """
     _msa = dten['msa']
-    if precut and recidx is not None:
+    if precut:
         if not dten['concated']:
             msa = torch.cat((_msa[:, recidx], _msa[:, ligidx]), dim=-1)
         else:
@@ -36,8 +36,6 @@ def load_msa(
     else:
         if not dten['concated']:
             msa = torch.cat((_msa, _msa), dim=-1)
-        else:
-            msa = _msa
         
     # TODO: sampling
     if max_row > 0:
@@ -65,5 +63,4 @@ def load_msa(
                 ),
                 dim=-1,
             )
-
     return msa 

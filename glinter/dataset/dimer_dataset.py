@@ -11,12 +11,12 @@ import torch
 from glinter.esm_embed import ESMROOT
 from glinter.protein import read_models, seq_encode, cigar_to_index
 
-from glinter.dataset._dist import bin_dist
 from glinter.dataset.msa_utils import load_tt, load_msa
 from glinter.dataset._geometric_graph import (
     build_ca_graph, build_atom_graph, build_surface_graph,
 )
 from glinter.points.utils import get_random_rotmat, add_gaussian_noise
+
 from glinter.dataset._feature import DimerFeature
 
 class DimerDataset:
@@ -35,6 +35,7 @@ class DimerDataset:
 
         # don't use esm if esm_alphabet is None
         self.esm_alphabet = esm_alphabet
+        # TODO: load dynamicly
         self.esm_tt = load_tt(args.esm_tt)
 
         self.max_row = max_row
@@ -45,17 +46,25 @@ class DimerDataset:
         if self._feature.use('pickled-esm') :
             self.esm_dir = args.esm_root
 
-        path = args.dimer_root #.joinpath(f'{split}.pkl')
+        path = args.dimer_root
         self.dimers = self._load_from_pickle(path)
 
         self._esm_data = dict()
 
     def _load_from_pickle(self, path):
+        esms = None
+        if self._feature.use('pickled-esm'):
+            esms = dict()
+            for esmpt in self.esm_dir.glob('**/*.esm.npz'):
+                esms[esmpt.stem.split('.')[0]] = esmpt
+
         with open(path, 'rb') as h:
             data = pickle.load(h)
 
         _dimers = []
         for mname in sorted(data):
+            if esms is not None and mname not in esms:
+                continue
             dten = data[mname]['dimer']
             recten = data[mname]['rec']
             ligten = data[mname]['lig']
@@ -65,19 +74,21 @@ class DimerDataset:
                 self.mtens[rec] = self._load_mten(mten=recten)
             if lig not in self.mtens:
                 self.mtens[lig] = self._load_mten(mten=ligten)
-            reclen = len(self.mtens[rec]['SEQ'])
-            liglen = len(self.mtens[lig]['SEQ'])
+            rec_alnidx = self.mtens[rec]['alnidx']
+            lig_alnidx = self.mtens[lig]['alnidx']
+
             # avoid cutting sequences for ESM-MSA-1
             if ( 
                 self.max_len > 0 and 
-                reclen + liglen > self.max_len
+                rec_alnidx.size(-1) + lig_alnidx.size(-1) > self.max_len
             ):
                 continue
             # the naming for hm is "recref:ligref", 
             # not compatible with the default naming used in _read_dimers
-            dname = mname
+            dname = recten['seqmap']['ref'] + ':' + ligten['seqmap']['ref']
             if dname not in self.dtens:
                 self.dtens[dname] = self._load_dten(dten=dten)
+
 
             _dimers.append((mname, rec, lig, dname))
 
@@ -140,37 +151,14 @@ class DimerDataset:
         return _d
 
     def get_msa(self, i):
-        data = dict()
-        recent, ligent = self.dimers[i][1:3]
-        if recent not in self.mtens:
-            self.mtens[recent] = self._load_mten(recent)
-        if ligent not in self.mtens:
-            self.mtens[ligent] = self._load_mten(ligent)
+        return self.getitem(i, return_msa=True)
 
-        rec = self.mtens[recent]
-        lig = self.mtens[ligent]
-        data['reclen'] = len(rec['SEQ'])
-        data['liglen'] = len(lig['SEQ'])
-
-        # load dimer tensors
-        dname = self.dimers[i][-1] # dtensor name
-        if dname not in self.dtens:
-            self.dtens[dname] = self._load_dten(dname)
-
-        dten = self.dtens[dname]
-        # load msa
-        # pre-cut MSA features: some targets could be overly long, due to
-        # the (potentialy) low tcov used during selecting pdb-a3m mappings
-        if 'msa' in dten:
-            data['msa'] = load_msa(
-                dten, self.max_row, esm_alphabet=self.esm_alphabet,
-            )
-
-        return dict(data=data)
-        
     def __getitem__(self, i):
+        return self.getitem(i)
+
+    def getitem(self, i, return_msa=False):
         if i in self.dataset:
-            sample = dict(data=dict(), tgt=self.dataset[i]['dist'])
+            sample = dict(data=dict(),)
             sample['data'].update(self.dataset[i]['feat'])
             if self.args.add_gaussian_noise and self.training:
                 sample = self._copy_graph(sample)
@@ -190,14 +178,15 @@ class DimerDataset:
 
         rec = self.mtens[recent]
         lig = self.mtens[ligent]
-        reclen = len(rec['SEQ'])
-        liglen = len(lig['SEQ'])
+        rec_alnidx = rec['alnidx']
+        lig_alnidx = lig['alnidx']
 
-
-        data = dict()
+        data = dict(
+            recidx=rec_alnidx[0], # only store srcidx, since msa features are pre-cut
+            ligidx=lig_alnidx[0],
+        )
 
         if self._feature.use('ca-embed', 'coordinate-ca-graph', 'distance-ca-graph'):
-            rec_alnidx, lig_alnidx = None, None
             _init_kwargs = dict(
                 use_distance_graph=self._feature.use('distance-ca-graph'),
                 only_embed=self._feature.use('ca-embed'),
@@ -245,8 +234,25 @@ class DimerDataset:
         if dname not in self.dtens:
             self.dtens[dname] = self._load_dten(dname)
 
+        recidx, ligidx = rec_alnidx[1], lig_alnidx[1]
+        reclen, liglen = recidx.size(0), ligidx.size(0)
         dten = self.dtens[dname]
 
+        # load msa
+        # pre-cut MSA features, because some targets could be overly long, since
+        # the (potentialy) low tcov used during selecting pdb-a3m mappings
+        if 'msa' in dten:
+            tgtlen = reclen + liglen + 1 # pre-cut with bos
+            # tgtlen = -1
+            data['msa'] = load_msa(
+                dten, self.max_row, recidx=recidx, ligidx=ligidx,
+                esm_alphabet=self.esm_alphabet,
+            )
+            assert data['msa'].size(-1) == tgtlen
+            data['reclen'] = reclen
+            data['liglen'] = liglen
+            if return_msa:
+                return dict(data=data)
         if 'ccm' in dten:
             _ccm = dten['ccm']
             if tuple(_ccm.size()) != (reclen, liglen):
@@ -260,11 +266,11 @@ class DimerDataset:
             assert tuple(_esm.size()[-2:]) == (reclen, liglen)
             self._esm_data[i] = _esm
 
-        # load distance
         data['mname'] = mname
-
         # build sample
-        self.dataset[i] = dict(feat=data)
+        self.dataset[i] = dict(
+            feat=data
+        )
 
         sample = dict(data=dict())
         sample['data'].update(self.dataset[i]['feat'])
@@ -277,14 +283,6 @@ class DimerDataset:
         # number of loaded dimers
         return len(self.dimers)
 
-    def _load_dist(self, mname=None, dist=None):
-        if dist is None:
-            dist_path = self.distdir.joinpath(mname + '.dist')
-            with open(dist_path, 'rb') as h:
-                dist = pickle.load(h)
-
-        dist = bin_dist(dist, clash_thr=0, dist_thrs=[8], num_cls=2)
-        return dist
     
     def _load_mten(self, ent=None, mten=None):
         _mten = dict()
@@ -294,6 +292,11 @@ class DimerDataset:
                 mten = pickle.load(h)
 
         _mten['SEQ'] = self.esm_tt[seq_encode(mten['SEQ'])]
+        seqmap = mten['seqmap']
+        alnidx = cigar_to_index(
+            seqmap['cigar'],seqmap['qbeg']-1, seqmap['tbeg']-1,
+        )
+        _mten['alnidx'] = alnidx
 
         for k in ('COORD', 'GROUP', 'ATOM', 'SAS', 'pssm'):
             _mten[k] = mten[k]
@@ -330,28 +333,6 @@ class DimerDataset:
         return _dten
     
     def _load_esm(self, mname):
-        esm_path = self.args.dimer_root.parent.joinpath(mname + '.esm.pkl')
-        with open(esm_path, 'rb') as h:
-            esm = pickle.load(h)
-        return esm
-
-if __name__ == '__main__':
-    import argparse
-
-    parser = argparse.ArgumentParser()
-
-    DimerDataset.add_args(parser)
-    args = parser.parse_args()
-
-    dataset = DimerDataset(args, max_len=1000)
-    nht, nhm = 0, 0
-    print(dataset.dimers)
-    for _, _, _, dname in dataset.dimers:
-        lig, rec = dname.split(':')
-        if lig == rec:
-            nhm += 1
-        else:
-            nht += 1
-    print(len(dataset), nht, nhm)
-    # print(dataset[0])
-    print(dataset.get_msa(0))
+        with np.load(self.esm_dir.joinpath(f'{mname}.esm.npz')) as fh:
+            esm = fh['esm']
+        return torch.HalfTensor(esm)

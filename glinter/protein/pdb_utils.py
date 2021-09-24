@@ -9,7 +9,7 @@ __all__ = [
     'get_pdbseq'
 ]
 
-def get_pdbseq(chain, thr=0.95):
+def get_pdbseq(chain, thr=0.95, return_positions=False):
     if isinstance(chain, Bio.PDB.Chain.Chain):
         residues = get_residues(chain,)
     else:
@@ -17,10 +17,14 @@ def get_pdbseq(chain, thr=0.95):
     if len(residues) == 0:
         return
     if thr < 0 or len(residues) / int(residues[-1].get_id()[1]) > thr:
-        _seq = []
+        _seq, _pos = [], []
         for residue in residues:
             _seq.append(three_to_one(residue.get_resname()))
-        return ''.join(_seq)
+            _pos.append(residue.id[1])
+        if return_positions:
+            return ''.join(_seq), _pos
+        else:
+            return ''.join(_seq)
     else:
         return
  

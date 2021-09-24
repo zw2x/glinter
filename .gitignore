@@ -1,7 +1,6 @@
 # old
-old/
-# ckpts
-ckpts/
+legacy/
+scratch/
 
 # externals
 examples/old
