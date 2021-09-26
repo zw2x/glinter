@@ -20,8 +20,8 @@ file_base=$tmpdir/$pdbid
 reduced=$tmpdir/$pdbid.reduced.pdb
 
 # reduce 
-$GLINT_ROOT/external/reduce/reduce -Trim $pdb > $tmpdir/tmp.pdb
-$GLINT_ROOT/external/reduce/reduce -HIS $tmpdir/tmp.pdb > $reduced
+$REDUCE_PATH/reduce -Trim $pdb > $tmpdir/tmp.pdb
+$REDUCE_PATH/reduce -HIS $tmpdir/tmp.pdb > $reduced
 
 # MSMS
 xyzrn=$tmpdir/$pdbid.xyzrn
