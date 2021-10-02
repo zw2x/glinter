@@ -54,3 +54,16 @@ def get_atoms(residue, ignore_h=True, return_ca=False,):
         atoms.append(atom)
 
     return atoms
+
+def get_coords(chain, return_ca=False, ignore_h=False):
+    atoms = [
+        get_atoms(residue, ignore_h=ignore_h, return_ca=return_ca) 
+        for residue in get_residues(chain)
+    ]
+    if len(atoms) == 0:
+        return None, None
+    sizes = torch.LongTensor([ len(_) for _ in atoms ])
+    coords = torch.cat([
+        torch.FloatTensor([atom.coord for atom in _]) for _ in atoms
+    ], dim=0,)
+    return coords, sizes

@@ -12,7 +12,8 @@ setup(
         "tqdm",
         "biopython",
         "matplotlib",
-        "trimesh"
+        "trimesh",
+        "scipy",
     ],
     packages=find_packages(
         exclude=[

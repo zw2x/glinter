@@ -18,6 +18,7 @@ def show(d, name1, name2, pos1, pos2):
         with open(f'{d}/{name2}:{name1}.out.pkl', 'rb') as fh:
             dataT = pickle.load(fh)['model']['output']
             score += np.exp(dataT[0,:,:,0].cpu().numpy().T)
+            score /= 2
     _pos1 = np.repeat(pos1[:,np.newaxis], len(pos2), axis=-1)
     _pos2 = np.repeat(pos2[np.newaxis, :], len(pos1), axis=0)
     ref_pos = np.concatenate(
