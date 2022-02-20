@@ -3,6 +3,8 @@ import os
 import numpy as np
 
 def read_residue_positions(pos_file):
+    if not os.path.exists(pos_file):
+        return
     with open(pos_file, 'rt') as fh:
         pos = [ int(_) for _ in fh.readline().strip().split() ]
     pos = np.array(pos, dtype=np.long)
@@ -19,6 +21,10 @@ def show(d, name1, name2, pos1, pos2):
             dataT = pickle.load(fh)['model']['output']
             score += np.exp(dataT[0,:,:,0].cpu().numpy().T)
             score /= 2
+    if pos1 is None:
+        pos1 = np.arange(1,score.shape[0]+1, dtype=np.int64)
+    if pos2 is None:
+        pos2 = np.arange(1,score.shape[1]+1, dtype=np.int64)
     _pos1 = np.repeat(pos1[:,np.newaxis], len(pos2), axis=-1)
     _pos2 = np.repeat(pos2[np.newaxis, :], len(pos1), axis=0)
     ref_pos = np.concatenate(
@@ -42,5 +48,6 @@ if __name__ == '__main__':
     with open(f'{srcdir}/score_mat.pkl', 'wb') as fh:
         pickle.dump(score, fh)
     with open(f'{srcdir}/ranked_pairs.txt', 'wt') as fh:
+        fh.write('# seq1 seq2 prob\n')
         for p1, p2, s in rank:
             fh.write(f'{int(p1)} {int(p2)} {float(s):.4f}\n')

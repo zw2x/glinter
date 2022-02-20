@@ -198,8 +198,10 @@ class MSAModel(nn.Module):
                     raise ValueError()
 
                 if x.size(-1) != int(liglen):
-                    print(x.size(), msa.size(), reclen, liglen)
-                    raise RuntimeError('shape mismatch in concated msa')
+                    raise RuntimeError(
+                        'shape mismatch in concated msa: '
+                        f'{x.size(), msa.size(), reclen, liglen}'
+                    )
 
             except RuntimeError as e:
                 raise e
@@ -274,6 +276,17 @@ class MSAModel(nn.Module):
 
         return y_rec, y_lig
 
+def move_to_cuda_(batch):
+    for key in batch:
+        value = batch[key]
+        if hasattr(value, 'cuda'):
+            batch[key] = value.cuda()
+        elif isinstance(value, dict):
+            move_to_cuda_(value)
+
+def cut_msa_(batch, num_seq=128):
+    batch['msa'] = batch['msa'][:, :num_seq]
+
 if __name__ == '__main__':
     import argparse
     import pickle
@@ -304,6 +317,7 @@ if __name__ == '__main__':
             model.load_state_dict(state, strict=True)
         dataset = DimerDataset(args,)
     collater = Collater()
+    model = model.cuda()
     model.eval()
     for i in range(len(dataset)):
         name = dataset.dimers[i][0]
@@ -311,15 +325,20 @@ if __name__ == '__main__':
             batch = collater([ dataset.get_msa(i) ])
             fname = args.dimer_root.parent.joinpath(name + '.esm.npz')
             with torch.no_grad():
+                cut_msa_(batch['data'])
+                move_to_cuda_(batch['data'])
                 output = model(batch['data']).cpu().numpy().astype(np.float16)
             np.savez_compressed(fname, esm=output)
+            print(f'dump esm at {fname}')
         else:
             batch = collater([ dataset[i] ])
             output = {'model':{}}
             with torch.no_grad():
+                move_to_cuda_(batch['data'])
                 output['model']['output'] = model(batch['data']).cpu()
             output['model']['recidx'] = batch['data']['recidx'].cpu()
             output['model']['ligidx'] = batch['data']['ligidx'].cpu()
             fname = args.dimer_root.parent.joinpath(name + '.out.pkl')
             with open(fname, 'wb') as handle:
                 pickle.dump(output, handle)
+            print(f'dump result at {fname}')

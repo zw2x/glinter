@@ -16,7 +16,7 @@ Manually install the following softwares and models
 * [MSMS](http://mgltools.scripps.edu/packages/MSMS/)
 * [reduce](http://kinemage.biochem.duke.edu/software/reduce.php)
 * [hh-suite](https://github.com/soedinglab/hh-suite)
-* [esm_msa1_t12_100M_UR50S](https://github.com/facebookresearch/esm)
+* [esm_msa1_t12_100M_UR50S](https://dl.fbaipublicfiles.com/fair-esm/models/esm_msa1_t12_100M_UR50S.pt)
 
 The taxonomy database can be found at 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.5172929.svg)](https://doi.org/10.5281/zenodo.5172929)
@@ -53,13 +53,13 @@ the first column is the positions in the receptor,
 the second column is the positions in the ligand,
 the third column is the probability.
 
+### Integration with AlphaFold-Multimer
+See `alphafold/example_run.sh` for using GLINTER given the predicted structures
+from AlphaFold.
+
 ## Note
 Please use the [uniclust database](http://wwwuser.gwdg.de/~compbiol/uniclust/2016_09/)
 `A3M_SpecBloc` requires the header of each hit starts with `tr|` and contains `OS=$TAX`, 
 `$TAX` is the taxonomy name.
-
-There are some known bugs in `scripts/concat_msa.sh`; 
-you can replace it with your own pipeline, see `scripts/build_hetero.sh`.
-We may provide a more comprehensive pipeline in future.
 
 Please use the model provided in the repo `ckpts/glinter1.pt` instead of the one from zenodo

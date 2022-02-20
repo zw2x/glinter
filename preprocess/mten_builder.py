@@ -170,6 +170,7 @@ if __name__ == '__main__':
         else:
             with open(tgt_path, 'wb') as h:
                 pickle.dump(mtensor, h)
+            print(f'dump mtensor at {tgt_path}')
         n += 1
 
     # print(n)

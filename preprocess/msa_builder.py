@@ -92,6 +92,7 @@ def heniw(msa, discount_gaps=True):
 
 def build_msa(
     tgtdir, msa_paths, seq_paths, use_a3mcc, use_tqdm, dump=True, maxk=128,
+    no_check=False,
 ):
     if use_tqdm:
         msa_paths = tqdm(msa_paths)
@@ -102,10 +103,14 @@ def build_msa(
             msa, query, (rec_len, lig_len) = read_a3mcc(
                 msa_path, fetch_length=True
             )
-            rec, lig = msa_name.split(':')
+            try:
+                rec, lig = msa_name.split(':')
+            except ValueError:
+                rec, lig = 'A', 'B'
             concated = True
-            assert len(read_seqfile(seq_paths[rec])) == rec_len
-            assert len(read_seqfile(seq_paths[lig])) == lig_len
+            if not no_check:
+                assert len(read_seqfile(seq_paths[rec])) == rec_len
+                assert len(read_seqfile(seq_paths[lig])) == lig_len
         else:
             msa, query, _len = read_a3mcc(
                 msa_path, fetch_length=False
@@ -147,9 +152,10 @@ def build_msa(
                 break
 
         tgt_path = tgtdir.joinpath(msa_path.stem + '.msa')
-
         with open(tgt_path, 'wb') as h:
             pickle.dump(sample, h)
+
+        print(f'dump msa feature at {tgt_path}')
 
         n += 1
     return n
@@ -171,6 +177,7 @@ def _get_options():
         help='the a3mdir is already filtered by hhfilter'
     )
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--no-check', action='store_true')
 
     args = parser.parse_args()
 
@@ -211,7 +218,7 @@ if __name__ == '__main__':
 
     if len(a3mpaths) == 0:
         raise RuntimeError('cannot find any a3ms')
-    if len(seqpaths) == 0:
+    if not args.no_check and len(seqpaths) == 0:
         raise RuntimeError('cannot find any seqs')
 
     if args.debug:
@@ -225,4 +232,5 @@ if __name__ == '__main__':
     if not args.tgtdir.exists():
         args.tgtdir.mkdir(parents=True,)
 
-    build_msa(args.tgtdir, a3mpaths, seqpaths, args.use_concat, False)
+    build_msa(args.tgtdir, a3mpaths, seqpaths, args.use_concat, False, 
+        no_check=args.no_check)

@@ -155,6 +155,7 @@ def _get_options():
     parser.add_argument('--repo', type=Path, help='repo path',)
     parser.add_argument('--msa-repo', type=Path, help='repo MSA path',)
     parser.add_argument('--check-seqid', action='store_true')
+    parser.add_argument('--from-paths', action='store_true')
     args = parser.parse_args()
 
     return args
@@ -173,11 +174,14 @@ if __name__ == '__main__':
     else:
         tpaths = None
 
-    if args.model:
-        models = read_models(args.model)
+    if args.from_paths:
+        models = {'A:B':'A:B'}
     else:
-        models = {args.mten_dir.stem: args.msa_dir.stem}
-    print(models)
+        if args.model:
+            models = read_models(args.model)
+        else:
+            models = {args.mten_dir.stem: args.msa_dir.stem}
+
     # find avail models
     hts, hms = dict(), dict()
     for mname in list(models.keys()):
@@ -208,7 +212,6 @@ if __name__ == '__main__':
             hts[mname] = (rec, lig)
 
 #    print(len(hts), len(hms))
-
     repo = {} if args.repo is not None else None
     msa_repo = {} if args.msa_repo is not None else None
     n = 0

@@ -242,6 +242,7 @@ def dump_feature(args, chs, overwrite=False, dump=True,):
             if dump:
                 with open(featpath, 'wb') as h:
                     pickle.dump(sample, h)
+                print(f'dump {featpath}')
             else:
                 print(sample['seqmap'], feat[0], feat[-1], sample['name'], sample['seq'])
                 print(sample['vertex']['coords'].shape)

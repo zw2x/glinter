@@ -1,9 +1,12 @@
+# modified by zw2x
+# 
 # Copyright (c) Facebook, Inc. and its affiliates.
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
 import math
+import logging
 from typing import Optional
 
 import torch
@@ -226,6 +229,8 @@ class LearnedPositionalEmbedding(nn.Embedding):
         """Input is expected to be of size [bsz x seqlen]."""
         mask = input.ne(self.padding_idx).int()
         positions = (torch.cumsum(mask, dim=1).type_as(mask) * mask).long() + self.padding_idx
+        positions = torch.clamp(positions, max=self.max_positions)
+        logging.getLogger().warning(f'clamp positions {positions.shape}')
         return F.embedding(
             positions,
             self.weight,
